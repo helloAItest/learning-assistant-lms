@@ -7,6 +7,8 @@ import os
 
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'lms.db')
 
+# ─── DDL ────────────────────────────────────────────────────────────────────
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,12 +35,13 @@ CREATE TABLE IF NOT EXISTS knowledge_points (
 CREATE TABLE IF NOT EXISTS wrong_questions (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id         INTEGER NOT NULL REFERENCES users(id),
+    -- 单一学生系统，始终引用 id=1 的学生记录
     subject_id         INTEGER NOT NULL REFERENCES subjects(id),
     knowledge_point_id INTEGER REFERENCES knowledge_points(id),
-    question_content   TEXT NOT NULL,
-    image_path         TEXT,
-    thumb_path         TEXT,
-    answer_content     TEXT,
+    question_content   TEXT NOT NULL,   -- 富文本 HTML 内容
+    image_path         TEXT,            -- 原图相对路径
+    thumb_path         TEXT,            -- 缩略图相对路径（限宽 800px）
+    answer_content     TEXT,            -- 解析/正确答案
     difficulty         INTEGER NOT NULL DEFAULT 2 CHECK(difficulty IN (1,2,3)),
     error_count        INTEGER NOT NULL DEFAULT 1,
     last_error_date    TEXT NOT NULL DEFAULT (date('now', 'localtime')),
@@ -52,6 +55,7 @@ CREATE TABLE IF NOT EXISTS review_plans (
     student_id         INTEGER NOT NULL REFERENCES users(id),
     knowledge_point_id INTEGER NOT NULL REFERENCES knowledge_points(id),
     review_stage       INTEGER NOT NULL DEFAULT 1 CHECK(review_stage BETWEEN 1 AND 6),
+    -- Stage 6 = 已掌握，不再提醒
     next_review_date   TEXT NOT NULL,
     created_at         TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     UNIQUE(student_id, knowledge_point_id)
@@ -78,27 +82,52 @@ CREATE TABLE IF NOT EXISTS mastery_scores (
 );
 """
 
-INITIAL_USERS = [(1, 'student', '同学'), (2, 'parent', '家长')]
+# ─── 预置数据 ────────────────────────────────────────────────────────────────
+
+INITIAL_USERS = [
+    (1, 'student', '同学'),
+    (2, 'parent',  '家长'),
+]
 
 INITIAL_SUBJECTS = [
-    ('语文', '📖', '#FF6B6B'), ('数学', '📐', '#4ECDC4'),
-    ('英语', '🔤', '#45B7D1'), ('物理', '⚡', '#96CEB4'),
-    ('化学', '🧪', '#F9CA24'), ('生物', '🌱', '#6C5CE7'),
-    ('历史', '📜', '#A29BFE'), ('地理', '🌍', '#00B894'),
+    ('语文', '📖', '#FF6B6B'),
+    ('数学', '📐', '#4ECDC4'),
+    ('英语', '🔤', '#45B7D1'),
+    ('物理', '⚡', '#96CEB4'),
+    ('化学', '🧪', '#F9CA24'),
+    ('生物', '🌱', '#6C5CE7'),
+    ('历史', '📜', '#A29BFE'),
+    ('地理', '🌍', '#00B894'),
     ('道德与法治', '⚖️', '#FD79A8'),
 ]
+
+# ─── 初始化函数 ──────────────────────────────────────────────────────────────
 
 def init_db():
     print(f"📂 数据库路径：{DATABASE_PATH}")
     conn = sqlite3.connect(DATABASE_PATH)
     conn.execute('PRAGMA foreign_keys = ON')
     conn.execute('PRAGMA journal_mode = WAL')
+
+    # 建表
     conn.executescript(SCHEMA)
-    conn.executemany("INSERT OR IGNORE INTO users(id, role, display_name) VALUES (?, ?, ?)", INITIAL_USERS)
-    conn.executemany("INSERT OR IGNORE INTO subjects(name, icon, color) VALUES (?, ?, ?)", INITIAL_SUBJECTS)
+
+    # 写入用户（IGNORE = 已存在时跳过）
+    conn.executemany(
+        "INSERT OR IGNORE INTO users(id, role, display_name) VALUES (?, ?, ?)",
+        INITIAL_USERS
+    )
+
+    # 写入科目
+    conn.executemany(
+        "INSERT OR IGNORE INTO subjects(name, icon, color) VALUES (?, ?, ?)",
+        INITIAL_SUBJECTS
+    )
+
     conn.commit()
     conn.close()
     print("✅ 数据库初始化完成！")
+
 
 if __name__ == '__main__':
     init_db()
