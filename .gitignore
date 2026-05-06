@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Uploads
+static/uploads/*.jpg
+static/uploads/*.jpeg
+static/uploads/*.png
+static/uploads/*.gif
+static/uploads/*.webp
+static/uploads/thumbs/*.jpg
+static/uploads/thumbs/*.jpeg
+static/uploads/thumbs/*.png
+static/uploads/thumbs/*.gif
+static/uploads/thumbs/*.webp
+
+# Logs & temp
+*.log
+pip_output.txt
+piplist.txt
