@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% block title %}错题本{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0"><i class="bi bi-x-circle-fill text-danger me-2"></i>错题本</h4>
+  {% if current_role == 'student' %}
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('wrong_questions.batch_import') }}" class="btn btn-outline-warning btn-sm px-3">
+      <i class="bi bi-images me-1"></i>批量扫描录入
+    </a>
+    <a href="{{ url_for('wrong_questions.create') }}" class="btn btn-primary btn-sm px-3">
+      <i class="bi bi-plus-lg me-1"></i>录入错题
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+{% if request.args.get('batch_saved') %}
+<div class="alert alert-success alert-dismissible fade show lms-alert" role="alert">
+  <i class="bi bi-check-circle-fill me-1"></i>
+  🎉 成功批量保存 <strong>{{ request.args.get('batch_saved') }}</strong> 道错题！
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{# ── 筛选栏 ────────────────────────────────────────────────────────────────── #}
+<form method="get" class="lms-card p-3 mb-4">
+  <div class="row g-2 align-items-end">
+    {# 科目筛选 #}
+    <div class="col-12 col-md-4">
+      <label class="form-label small fw-bold mb-1">科目</label>
+      <div class="d-flex flex-wrap gap-1">
+        <a href="{{ url_for('wrong_questions.index', difficulty=selected_difficulty, q=keyword) }}"
+           class="btn btn-sm filter-chip {% if not selected_subject %}active{% endif %}">全部</a>
+        {% for s in subjects %}
+        <a href="{{ url_for('wrong_questions.index', subject_id=s.id, difficulty=selected_difficulty, q=keyword) }}"
+           class="btn btn-sm filter-chip {% if selected_subject == s.id %}active{% endif %}"
+           style="--chip-color:{{ s.color }}">
+          {{ s.icon }} {{ s.name }}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# 难度筛选 #}
+    <div class="col-6 col-md-2">
+      <label class="form-label small fw-bold mb-1">难度</label>
+      <select name="difficulty" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">全部难度</option>
+        <option value="1" {% if selected_difficulty==1 %}selected{% endif %}>😊 简单</option>
+        <option value="2" {% if selected_difficulty==2 %}selected{% endif %}>😐 中等</option>
+        <option value="3" {% if selected_difficulty==3 %}selected{% endif %}>😤 困难</option>
+      </select>
+      <input type="hidden" name="subject_id" value="{{ selected_subject or '' }}">
+    </div>
+
+    {# 搜索 #}
+    <div class="col-6 col-md-4">
+      <label class="form-label small fw-bold mb-1">关键字</label>
+      <div class="input-group input-group-sm">
+        <input type="text" name="q" class="form-control" placeholder="搜索题目内容..." value="{{ keyword }}">
+        <input type="hidden" name="subject_id" value="{{ selected_subject or '' }}">
+        <input type="hidden" name="difficulty" value="{{ selected_difficulty or '' }}">
+        <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+      </div>
+    </div>
+
+    {# 计数 #}
+    <div class="col-12 col-md-2 text-end">
+      <span class="text-muted small">共 <strong>{{ total }}</strong> 道</span>
+    </div>
+  </div>
+</form>
+
+{# ── 列表 ────────────────────────────────────────────────────────────────── #}
+{% if items %}
+<div class="row g-3">
+  {% for wq in items %}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="lms-card p-3 h-100 {% if wq.is_mastered %}wq-card--mastered{% endif %}">
+
+      {# 头部：科目标签 + 难度 #}
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="subject-tag" style="background:{{ wq.subject_color }}20; color:{{ wq.subject_color }}; border:1px solid {{ wq.subject_color }}40;">
+          {{ wq.subject_icon }} {{ wq.subject_name }}
+        </span>
+        <span class="badge difficulty-badge difficulty-{{ wq.difficulty }}">
+          {{ '简单' if wq.difficulty==1 else ('中等' if wq.difficulty==2 else '困难') }}
+        </span>
+      </div>
+
+      {# 缩略图 #}
+      {% if wq.thumb_path %}
+      <div class="wq-thumb-wrap mb-2">
+        <img src="{{ url_for('static', filename=wq.thumb_path) }}"
+             class="img-fluid rounded" alt="题目图片" style="max-height:120px; object-fit:cover; width:100%;">
+      </div>
+      {% endif %}
+
+      {# 题目预览 #}
+      <div class="wq-preview-text small mb-2" style="-webkit-line-clamp:3;">
+        {{ wq.question_content | striptags | truncate(80) }}
+      </div>
+
+      {# 知识点 #}
+      {% if wq.kp_name %}
+      <div class="mb-2">
+        <span class="badge bg-light text-secondary border" style="font-size:.75rem;">
+          <i class="bi bi-tag-fill me-1"></i>{{ wq.kp_name }}
+        </span>
+      </div>
+      {% endif %}
+
+      {# 底部：掌握状态 + 查看按鈕 #}
+      <div class="d-flex justify-content-between align-items-center mt-auto pt-2">
+        {% if wq.is_mastered %}
+        <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>已掌握</span>
+        {% else %}
+        <span class="text-muted small">错误 {{ wq.error_count }} 次</span>
+        {% endif %}
+        <a href="{{ url_for('wrong_questions.detail', wq_id=wq.id) }}"
+           class="btn btn-sm btn-outline-primary">查看</a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# 分页 #}
+{% if total_pages > 1 %}
+<nav class="mt-4 d-flex justify-content-center">
+  <ul class="pagination pagination-sm">
+    {% for p in range(1, total_pages+1) %}
+    <li class="page-item {% if p==page %}active{% endif %}">
+      <a class="page-link" href="{{ url_for('wrong_questions.index', page=p, subject_id=selected_subject, difficulty=selected_difficulty, q=keyword) }}">{{ p }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="empty-state lms-card py-5">
+  <i class="bi bi-inbox"></i>
+  <p class="mt-3">
+    {% if keyword or selected_subject or selected_difficulty %}
+      没有找到匹配的错题，<a href="{{ url_for('wrong_questions.index') }}">清除筛选</a>
+    {% else %}
+      还没有录入任何错题 📝<br>
+      {% if current_role == 'student' %}
+      <a href="{{ url_for('wrong_questions.create') }}" class="btn btn-primary btn-sm mt-2">录入第一道错题</a>
+      {% endif %}
+    {% endif %}
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.filter-chip {
+  border: 1px solid #dde;
+  border-radius: 20px;
+  padding: .2rem .7rem;
+  font-size: .8rem;
+  color: #555;
+  background: #f8f8ff;
+  white-space: nowrap;
+}
+.filter-chip.active {
+  background: var(--lms-primary);
+  color: #fff;
+  border-color: var(--lms-primary);
+}
+.subject-tag {
+  display: inline-block;
+  padding: .2rem .6rem;
+  border-radius: 12px;
+  font-size: .78rem;
+  font-weight: 600;
+}
+.wq-card--mastered { opacity: .7; }
+.wq-preview-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: #555;
+  line-height: 1.5;
+}
+</style>
+{% endblock %}

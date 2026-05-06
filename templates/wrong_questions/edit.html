@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block title %}编辑错题{% endblock %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
+<style>
+.ql-container { font-size: 15px; min-height: 160px; border-radius: 0 0 8px 8px; }
+.ql-toolbar  { border-radius: 8px 8px 0 0; }
+.form-section { background:#fff; border:1px solid var(--lms-border); border-radius:var(--lms-radius); padding:1.5rem; margin-bottom:1.2rem; }
+.form-section-title { font-size:.9rem; font-weight:700; color:var(--lms-primary); margin-bottom:1rem; }
+.image-preview { max-width:100%; max-height:200px; border-radius:8px; margin-top:.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('wrong_questions.detail', wq_id=wq.id) }}" class="btn btn-sm btn-light">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h4 class="fw-bold mb-0"><i class="bi bi-pencil-fill text-primary me-2"></i>编辑错题</h4>
+</div>
+
+<form method="post" enctype="multipart/form-data" id="editForm">
+
+  {# ── 基本信息 ────────────────────────────────────────────────────────────────── #}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-info-circle me-1"></i>基本信息</div>
+    <div class="row g-3">
+
+      <div class="col-md-4">
+        <label class="form-label fw-bold">科目</label>
+        <select name="subject_id" id="subjectSelect" class="form-select" required>
+          {% for s in subjects %}
+          <option value="{{ s.id }}" {% if s.id == wq.subject_id %}selected{% endif %}>
+            {{ s.icon }} {{ s.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label fw-bold">知识点</label>
+        <select name="knowledge_point_id" id="kpSelect" class="form-select">
+          <option value="">— 暂不指定 —</option>
+          {% for kp in kps %}
+          <option value="{{ kp.id }}" {% if kp.id == wq.knowledge_point_id %}selected{% endif %}>
+            [{{ kp.chapter }}] {{ kp.name }}
+          </option>
+          {% endfor %}
+          <option value="__new__">✏️ 新建知识点…</option>
+        </select>
+      </div>
+
+      <div class="col-md-4" id="kpNewField" style="display:none;">
+        <label class="form-label fw-bold">新建知识点名称</label>
+        <input type="text" name="new_kp_name" class="form-control" placeholder="输入新知识点名称">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label fw-bold">难度</label>
+        <div class="d-flex gap-2">
+          {% for val, label, emoji in [(1,'简单','😊'),(2,'中等','😐'),(3,'困难','😤')] %}
+          <input type="radio" class="btn-check" name="difficulty" id="diff{{ val }}" value="{{ val }}"
+                 {% if val == wq.difficulty %}checked{% endif %}>
+          <label class="btn btn-outline-secondary btn-sm" for="diff{{ val }}">{{ emoji }} {{ label }}</label>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  {# ── 题目内容 ────────────────────────────────────────────────────────────────── #}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-file-text me-1"></i>题目内容</div>
+    <div id="questionEditor"></div>
+    <input type="hidden" name="question_content" id="questionContent">
+  </div>
+
+  {# ── 图片 ────────────────────────────────────────────────────────────────────── #}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-image me-1"></i>题目图片</div>
+    {% if wq.thumb_path %}
+    <div class="mb-2">
+      <img src="{{ url_for('static', filename=wq.thumb_path) }}" class="image-preview" alt="当前图片">
+      <div class="text-muted small mt-1">当前图片，上传新图片将覆盖</div>
+    </div>
+    {% endif %}
+    <input type="file" name="image" class="form-control" accept=".jpg,.jpeg,.png,.gif,.webp">
+    <div class="form-text">不上传则保留原图</div>
+  </div>
+
+  {# ── 解析 ────────────────────────────────────────────────────────────────────── #}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-lightbulb me-1"></i>解析 / 正确答案</div>
+    <div id="answerEditor"></div>
+    <input type="hidden" name="answer_content" id="answerContent">
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary px-4">
+      <i class="bi bi-check-lg me-1"></i>保存修改
+    </button>
+    <a href="{{ url_for('wrong_questions.detail', wq_id=wq.id) }}" class="btn btn-outline-secondary">取消</a>
+  </div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script>
+const toolbarOptions = [
+  ['bold','italic','underline','strike'],
+  ['blockquote','code-block'],
+  [{'header':[1,2,3,false]}],
+  [{'list':'ordered'},{'list':'bullet'}],
+  [{'color':[]},{'background':[]}],
+  ['clean']
+];
+
+const questionQuill = new Quill('#questionEditor', {
+  theme: 'snow',
+  modules: { toolbar: toolbarOptions },
+});
+const answerQuill = new Quill('#answerEditor', {
+  theme: 'snow',
+  modules: { toolbar: toolbarOptions },
+});
+
+// 回填原有内容
+questionQuill.root.innerHTML = {{ wq.question_content | tojson }};
+answerQuill.root.innerHTML   = {{ (wq.answer_content or '') | tojson }};
+
+// 科目切换 → 重新加载知识点
+document.getElementById('subjectSelect').addEventListener('change', async function() {
+  const sid = this.value;
+  const kpSel = document.getElementById('kpSelect');
+  if (!sid) return;
+  const resp = await fetch(`/api/knowledge-points/${sid}`);
+  const kps  = await resp.json();
+  kpSel.innerHTML = '<option value="">— 暂不指定 —</option>'
+    + kps.map(k => `<option value="${k.id}">[${k.chapter}] ${k.name}</option>`).join('')
+    + '<option value="__new__">✏️ 新建知识点…</option>';
+});
+
+document.getElementById('kpSelect').addEventListener('change', function() {
+  const newField = document.getElementById('kpNewField');
+  newField.style.display = this.value === '__new__' ? 'block' : 'none';
+  if (this.value === '__new__') this.value = '';
+});
+
+document.getElementById('editForm').addEventListener('submit', () => {
+  document.getElementById('questionContent').value = questionQuill.root.innerHTML;
+  document.getElementById('answerContent').value   = answerQuill.root.innerHTML;
+});
+</script>
+{% endblock %}

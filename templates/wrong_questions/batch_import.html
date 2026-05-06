@@ -1,0 +1,485 @@
+{% extends 'base.html' %}
+{% block title %}批量录入错题{% endblock %}
+
+{% block head %}
+<style>
+/* ── 拖拽上传区 ───────────────────────────────────────────────────── */
+.drop-zone {
+  border: 2px dashed var(--lms-primary);
+  border-radius: var(--lms-radius);
+  background: #f8f9ff;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background .2s, border-color .2s;
+}
+.drop-zone.dragover {
+  background: #eef0ff;
+  border-color: var(--lms-secondary);
+}
+.drop-zone__icon   { font-size: 3rem; display: block; }
+.drop-zone__hint   { color: var(--lms-muted); font-size: .9rem; margin-top: .5rem; }
+
+/* ── 进度 ──────────────────────────────────────────────────────────── */
+#progressSection { display:none; }
+.progress-label  { font-size: .85rem; margin-bottom: .4rem; }
+
+/* ── 结果卡片 ───────────────────────────────────────────────────────── */
+#resultsSection  { display:none; }
+.result-card {
+  background: #fff;
+  border: 1px solid var(--lms-border);
+  border-radius: var(--lms-radius);
+  box-shadow: var(--lms-shadow);
+  padding: 1rem;
+  position: relative;
+}
+.result-card__img {
+  width: 100%; max-height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: zoom-in;
+}
+.result-card__remove {
+  position: absolute; top: .5rem; right: .5rem;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #ff4d4d; color:#fff;
+  border: none; font-size: 1rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  opacity: .8;
+}
+.result-card__remove:hover { opacity: 1; }
+.ocr-warning { background:#fff8e1; border-left:4px solid #f9ca24; }
+
+/* ── Diff 标注 ─────────────────────────────────────────────────────────────── */
+.subject-select { font-size: .85rem; }
+.difficulty-radio label { font-size: .8rem; padding: .2rem .5rem; }
+
+/* ── 图片放大预览 Modal ──────────────────────────────────────────── */
+#zoomModal .modal-body { padding: 0; }
+#zoomImg { width: 100%; border-radius: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('wrong_questions.index') }}" class="btn btn-sm btn-light">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h4 class="fw-bold mb-0">
+    <i class="bi bi-images text-primary me-2"></i>批量录入错题
+  </h4>
+</div>
+
+{# ── OCR 状态提示 ────────────────────────────────────────────────────── #}
+{% if ocr_available %}
+<div class="alert alert-success py-2 mb-3">
+  <i class="bi bi-check-circle-fill me-1"></i>
+  OCR 就绪（Tesseract）— 上传图片后将自动识别题目内容、科目、难度
+</div>
+{% else %}
+<div class="alert alert-warning py-2 mb-3">
+  <i class="bi bi-exclamation-triangle-fill me-1"></i>
+  <strong>OCR 未就绪</strong>（{{ ocr_msg.split('.')[0] }}）
+  — 可先上传图片，手动填写识别结果。
+  <a href="https://github.com/UB-Mannheim/tesseract/wiki" target="_blank" class="ms-2">
+    安装 Tesseract →
+  </a>
+</div>
+{% endif %}
+
+{# ── 步骤说明 ─────────────────────────────────────────────────────────────── #}
+<div class="d-flex gap-3 mb-4 step-bar flex-wrap">
+  <div class="step active" id="step1-indicator">
+    <span class="step-num">1</span> 选择图片
+  </div>
+  <i class="bi bi-chevron-right text-muted my-auto"></i>
+  <div class="step" id="step2-indicator">
+    <span class="step-num">2</span> OCR 识别
+  </div>
+  <i class="bi bi-chevron-right text-muted my-auto"></i>
+  <div class="step" id="step3-indicator">
+    <span class="step-num">3</span> 审核保存
+  </div>
+</div>
+
+{# ═══ 步骤 1：拖拽上传 ═════════════════════════════════════════════════════ #}
+<div id="uploadSection">
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <span class="drop-zone__icon">🖼️</span>
+    <h5 class="mt-3 mb-1">拖拽图片到此处，或点击选择</h5>
+    <p class="drop-zone__hint">支持 JPG / PNG / WebP / GIF，最多 <strong>10 张</strong>，每张不超过 5MB</p>
+  </div>
+  <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp,.gif"
+         multiple style="display:none" onchange="handleFiles(this.files)">
+
+  <div id="previewStrip" class="d-flex flex-wrap gap-2 mt-3"></div>
+
+  <div class="mt-3 d-flex gap-2">
+    <button class="btn btn-primary px-4" id="startOcrBtn" onclick="startOCR()" disabled>
+      <i class="bi bi-cpu-fill me-1"></i>开始识别
+    </button>
+    <span class="text-muted small my-auto" id="fileCount"></span>
+  </div>
+</div>
+
+{# ═══ 步骤 2：进度 ════════════════════════════════════════════════════════════ #}
+<div id="progressSection" class="mt-3 lms-card p-4">
+  <div class="progress-label">
+    <strong>正在处理图片...</strong>
+    <span id="progressText" class="text-muted ms-2"></span>
+  </div>
+  <div class="progress" style="height:10px; border-radius:8px;">
+    <div class="progress-bar progress-bar-striped progress-bar-animated"
+         id="progressBar" style="width:0%; background: var(--lms-primary);"></div>
+  </div>
+</div>
+
+{# ═══ 步骤 3：审核结果 ═════════════════════════════════════════════════════════════ #}
+<div id="resultsSection" class="mt-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold mb-0">
+      <i class="bi bi-check2-square me-1 text-success"></i>
+      审核识别结果 — 确认后批量保存
+    </h5>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" onclick="resetAll()">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>重新上传
+      </button>
+      <button class="btn btn-success px-4" id="saveAllBtn" onclick="saveAll()">
+        <i class="bi bi-check-lg me-1"></i>保存全部
+        <span class="badge bg-white text-success ms-1" id="saveCount">0</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="row g-3" id="resultsGrid"></div>
+</div>
+
+{# 图片放大 Modal #}
+<div class="modal fade" id="zoomModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body p-0">
+        <img id="zoomImg" src="" alt="原图" class="rounded">
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ─── 科目列表（来自后端模板渲染） ────────────────────────────────────────────
+const SUBJECTS = [
+  {% for s in subjects %}
+  { id: {{ s.id }}, name: "{{ s.name }}", icon: "{{ s.icon }}", color: "{{ s.color }}" },
+  {% endfor %}
+];
+
+const DIFFICULTY_LABELS = { 1: '😊 简单', 2: '😐 中等', 3: '😤 困难' };
+
+let selectedFiles  = [];  // FileList 的副本
+let ocrResults     = [];  // OCR 返回结果数组
+
+// ─── 文件选择处理 ───────────────────────────────────────────────────────────────────nfunction handleFiles(files) {
+  const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+  selectedFiles = arr.slice(0, 10);
+  renderPreviewStrip();
+  document.getElementById('startOcrBtn').disabled = selectedFiles.length === 0;
+  document.getElementById('fileCount').textContent =
+    selectedFiles.length > 0 ? `已选择 ${selectedFiles.length} 张图片` : '';
+}
+
+function renderPreviewStrip() {
+  const strip = document.getElementById('previewStrip');
+  strip.innerHTML = '';
+  selectedFiles.forEach((f, i) => {
+    const url = URL.createObjectURL(f);
+    strip.innerHTML += `
+      <div class="position-relative" style="width:80px; height:80px;">
+        <img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;border:2px solid #dde;">
+        <button onclick="removeFile(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ff4d4d;color:#fff;border:none;font-size:.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
+      </div>`;
+  });
+}
+
+function removeFile(idx) {
+  selectedFiles.splice(idx, 1);
+  renderPreviewStrip();
+  document.getElementById('startOcrBtn').disabled = selectedFiles.length === 0;
+  document.getElementById('fileCount').textContent =
+    selectedFiles.length > 0 ? `已选择 ${selectedFiles.length} 张图片` : '';
+}
+
+// ─── 拖拽上传 ────────────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+// ─── 开始 OCR ──────────────────────────────────────────────────────────────────
+async function startOCR() {
+  if (!selectedFiles.length) return;
+
+  // 切换到步骤2
+  setStep(2);
+  document.getElementById('progressSection').style.display = 'block';
+  document.getElementById('startOcrBtn').disabled = true;
+
+  const formData = new FormData();
+  selectedFiles.forEach(f => formData.append('images', f));
+
+  updateProgress(10, '正在上传...');
+
+  try {
+    const resp = await fetch('/api/batch-ocr', {
+      method: 'POST',
+      body: formData,
+    });
+    updateProgress(70, 'OCR 识别中...');
+
+    const data = await resp.json();
+    updateProgress(100, '识别完成！');
+
+    ocrResults = data.results || [];
+    setTimeout(() => {
+      document.getElementById('progressSection').style.display = 'none';
+      renderResults(ocrResults);
+      setStep(3);
+    }, 500);
+
+  } catch (err) {
+    alert('识别失败：' + err.message);
+    document.getElementById('progressSection').style.display = 'none';
+    document.getElementById('startOcrBtn').disabled = false;
+    setStep(1);
+  }
+}
+
+function updateProgress(pct, text) {
+  document.getElementById('progressBar').style.width  = pct + '%';
+  document.getElementById('progressText').textContent = text;
+}
+
+// ─── 渲染审核卡片 ────────────────────────────────────────────────────────────────
+function renderResults(results) {
+  const grid = document.getElementById('resultsGrid');
+  grid.innerHTML = '';
+  document.getElementById('resultsSection').style.display = 'block';
+  updateSaveCount();
+
+  results.forEach((r, idx) => {
+    if (r.error) {
+      grid.innerHTML += `
+        <div class="col-12">
+          <div class="alert alert-danger py-2 mb-0">
+            <i class="bi bi-exclamation-circle me-1"></i>
+            <strong>${r.filename}</strong>：${r.error}
+          </div>
+        </div>`;
+      return;
+    }
+
+    const subjectOptions = SUBJECTS.map(s =>
+      `<option value="${s.id}" ${s.id === r.subject_id ? 'selected' : ''}>${s.icon} ${s.name}</option>`
+    ).join('');
+
+    const diffBtns = [1,2,3].map(d =>
+      `<input type="radio" class="btn-check" name="diff_${idx}" id="diff_${idx}_${d}" value="${d}" ${d === r.difficulty ? 'checked' : ''}>
+       <label class="btn btn-outline-secondary btn-sm" for="diff_${idx}_${d}">${DIFFICULTY_LABELS[d]}</label>`
+    ).join('');
+
+    const ocrNote = r.ocr_available
+      ? `<span class="badge bg-success-subtle text-success border border-success">✓ OCR 识别</span>`
+      : `<span class="badge bg-warning-subtle text-warning border border-warning">⚠ OCR 不可用，请手动填写</span>`;
+
+    const thumbSrc = r.thumb_path ? `/static/${r.thumb_path}` : '';
+
+    grid.innerHTML += `
+    <div class="col-12 col-md-6" id="card_${idx}">
+      <div class="result-card">
+        <button class="result-card__remove" title="移除此题" onclick="removeResult(${idx})">×</button>
+
+        ${thumbSrc ? `
+        <img src="${thumbSrc}" class="result-card__img mb-2" alt="题目图片"
+             onclick="zoomImage('/static/${r.image_path}')">` : ''}
+
+        <div class="d-flex align-items-center gap-2 mb-2">
+          ${ocrNote}
+          <span class="text-muted small">${r.filename}</span>
+        </div>
+
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label small fw-bold mb-1">科目 *</label>
+            <select class="form-select form-select-sm subject-select" id="subject_${idx}"
+                    onchange="updateSaveCount()">
+              <option value="">— 请选择 —</option>
+              ${subjectOptions}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-bold mb-1">难度</label>
+            <div class="d-flex gap-1 flex-wrap difficulty-radio">
+              ${diffBtns}
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small fw-bold mb-1">题目内容 *</label>
+          <textarea class="form-control form-control-sm" id="question_${idx}"
+                    rows="4" placeholder="OCR 识别结果（可编辑）..."
+                    oninput="updateSaveCount()">${r.question_content || ''}</textarea>
+        </div>
+
+        <div>
+          <label class="form-label small fw-bold mb-1">解析/答案</label>
+          <textarea class="form-control form-control-sm" id="answer_${idx}"
+                    rows="2" placeholder="解析/答案（可选）...">${r.answer_content || ''}</textarea>
+        </div>
+
+        <input type="hidden" id="img_path_${idx}" value="${r.image_path || ''}">
+        <input type="hidden" id="thumb_path_${idx}" value="${r.thumb_path || ''}">
+      </div>
+    </div>`;
+  });
+}
+
+// ─── 移除某张 ───────────────────────────────────────────────────────────────────────
+function removeResult(idx) {
+  const card = document.getElementById('card_' + idx);
+  if (card) card.remove();
+  updateSaveCount();
+}
+
+// ─── 统计有效数量 ──────────────────────────────────────────────────────────────────
+function updateSaveCount() {
+  let valid = 0;
+  ocrResults.forEach((r, idx) => {
+    const card = document.getElementById('card_' + idx);
+    if (!card) return;
+    const subjectOk = document.getElementById('subject_' + idx)?.value;
+    const questionOk = document.getElementById('question_' + idx)?.value.trim();
+    if (subjectOk && questionOk) valid++;
+  });
+  document.getElementById('saveCount').textContent = valid;
+  document.getElementById('saveAllBtn').disabled = valid === 0;
+}
+
+// ─── 批量保存 ────────────────────────────────────────────────────────────────────
+async function saveAll() {
+  const questions = [];
+
+  ocrResults.forEach((r, idx) => {
+    const card = document.getElementById('card_' + idx);
+    if (!card) return;
+
+    const subjectId  = parseInt(document.getElementById('subject_' + idx)?.value);
+    const qContent   = document.getElementById('question_' + idx)?.value.trim();
+    const aContent   = document.getElementById('answer_' + idx)?.value.trim();
+    const difficulty = parseInt(document.querySelector(`input[name="diff_${idx}"]:checked`)?.value || 2);
+    const imgPath    = document.getElementById('img_path_' + idx)?.value;
+    const thumbPath  = document.getElementById('thumb_path_' + idx)?.value;
+
+    if (!subjectId || !qContent) return;
+
+    questions.push({
+      subject_id:       subjectId,
+      question_content: qContent,
+      answer_content:   aContent,
+      difficulty:       difficulty,
+      image_path:       imgPath,
+      thumb_path:       thumbPath,
+    });
+  });
+
+  if (!questions.length) {
+    alert('请至少填写一道题目的科目和内容');
+    return;
+  }
+
+  document.getElementById('saveAllBtn').disabled = true;
+  document.getElementById('saveAllBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+
+  try {
+    const resp = await fetch('/api/batch-save', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ questions }),
+    });
+    const data = await resp.json();
+
+    if (data.saved > 0) {
+      window.location.href = `/wrong-questions/?batch_saved=${data.saved}`;
+    } else {
+      alert('保存失败，请检查表单内容');
+      document.getElementById('saveAllBtn').disabled = false;
+      document.getElementById('saveAllBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>保存全部';
+    }
+  } catch (err) {
+    alert('保存出错：' + err.message);
+    document.getElementById('saveAllBtn').disabled = false;
+    document.getElementById('saveAllBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i>保存全部';
+  }
+}
+
+// ─── 重置 ───────────────────────────────────────────────────────────────────────────────
+function resetAll() {
+  selectedFiles = [];
+  ocrResults    = [];
+  document.getElementById('uploadSection').style.display    = 'block';
+  document.getElementById('resultsSection').style.display   = 'none';
+  document.getElementById('progressSection').style.display  = 'none';
+  document.getElementById('previewStrip').innerHTML          = '';
+  document.getElementById('resultsGrid').innerHTML           = '';
+  document.getElementById('startOcrBtn').disabled = true;
+  document.getElementById('fileCount').textContent = '';
+  document.getElementById('fileInput').value = '';
+  setStep(1);
+}
+
+// ─── 步骤指示器 ─────────────────────────────────────────────────────────────────────
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('step' + i + '-indicator');
+    if (el) {
+      el.classList.toggle('active', i <= n);
+      el.classList.toggle('done',   i < n);
+    }
+  });
+}
+
+// ─── 图片放大 ──────────────────────────────────────────────────────────────────────────────
+function zoomImage(src) {
+  document.getElementById('zoomImg').src = src;
+  new bootstrap.Modal(document.getElementById('zoomModal')).show();
+}
+</script>
+
+<style>
+.step-bar { align-items: center; }
+.step {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .35rem .8rem; border-radius: 20px;
+  background: #f0f0f8; color: #aaa; font-size: .85rem; font-weight: 600;
+}
+.step.active { background: var(--lms-primary); color: #fff; }
+.step.done   { background: #27ae60; color: #fff; }
+.step-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(255,255,255,.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; font-weight: 700;
+}
+.bg-success-subtle { background: #d4edda; }
+.bg-warning-subtle { background: #fff3cd; }
+</style>
+{% endblock %}

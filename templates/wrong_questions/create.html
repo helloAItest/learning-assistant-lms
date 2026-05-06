@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% block title %}录入错题{% endblock %}
+
+{% block head %}
+<!-- Quill.js 2.x -->
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
+<style>
+.ql-container { font-size: 15px; min-height: 160px; border-radius: 0 0 8px 8px; }
+.ql-toolbar { border-radius: 8px 8px 0 0; }
+.form-section { background:#fff; border:1px solid var(--lms-border); border-radius:var(--lms-radius); padding:1.5rem; margin-bottom:1.2rem; }
+.form-section-title { font-size:.9rem; font-weight:700; color:var(--lms-primary); margin-bottom:1rem; }
+.kp-new-field { display:none; }
+.image-preview { max-width:100%; max-height:200px; border-radius:8px; display:none; margin-top:.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('wrong_questions.index') }}" class="btn btn-sm btn-light">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h4 class="fw-bold mb-0"><i class="bi bi-plus-circle-fill text-primary me-2"></i>录入错题</h4>
+</div>
+
+<form method="post" enctype="multipart/form-data" id="wqForm">
+
+  {# ── 1. 基本信息 ────────────────────────────────────────────────────────────────── #}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-info-circle me-1"></i>基本信息</div>
+    <div class="row g-3">
+
+      {# 科目 #}
+      <div class="col-md-4">
+        <label class="form-label fw-bold">科目 <span class="text-danger">*</span></label>
+        <select name="subject_id" id="subjectSelect" class="form-select" required>
+          <option value="">— 请选择科目 —</option>
+          {% for s in subjects %}
+          <option value="{{ s.id }}" data-color="{{ s.color }}">{{ s.icon }} {{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {# 知识点 #}
+      <div class="col-md-4">
+        <label class="form-label fw-bold">知识点</label>
+        <select name="knowledge_point_id" id="kpSelect" class="form-select">
+          <option value="">— 请先选择科目 —</option>
+        </select>
+      </div>
+
+      {# 新建知识点 #}
+      <div class="col-md-4 kp-new-field" id="kpNewField">
+        <label class="form-label fw-bold">新建知识点名称</label>
+        <input type="text" name="new_kp_name" id="newKpName" class="form-control"
+               placeholder="输入新知识点名称">
+        <div class="form-text">留空则不创建新知识点</div>
+      </div>
+
+      {# 难度 #}
+      <div class="col-md-4">
+        <label class="form-label fw-bold">难度</label>
+        <div class="d-flex gap-2">
+          {% for val, label, emoji in [(1,'简单','😊'),(2,'中等','😐'),(3,'困难','😤')] %}
+          <input type="radio" class="btn-check" name="difficulty" id="diff{{ val }}" value="{{ val }}"
+                 {% if val==2 %}checked{% endif %}>
+          <label class="btn btn-outline-secondary btn-sm" for="diff{{ val }}">{{ emoji }} {{ label }}</label>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  {# ── 2. 题目内容 ────────────────────────────────────────────────────────────────── #}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-file-text me-1"></i>题目内容 <span class="text-danger">*</span></div>
+    <div id="questionEditor"></div>
+    <input type="hidden" name="question_content" id="questionContent">
+    <div class="form-text mt-1">支持富文本格式。数学公式请使用 $公式$ 或 $$公式$$ 语法，提交后自动渲染。</div>
+  </div>
+
+  {# ── 3. 图片上传 ─────────────────────────────────────────────────────────────────── #}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-image me-1"></i>题目图片（可选）</div>
+    <div class="row g-2 align-items-start">
+      <div class="col-md-6">
+        <input type="file" name="image" id="imageInput" class="form-control"
+               accept=".jpg,.jpeg,.png,.gif,.webp">
+        <div class="form-text">支持 JPG / PNG / WebP / GIF，最大 5MB。上传后自动生成缩略图。</div>
+      </div>
+      <div class="col-md-6">
+        <img id="imagePreview" class="image-preview" src="#" alt="预览">
+      </div>
+    </div>
+  </div>
+
+  {# ── 4. 解析/答案 ────────────────────────────────────────────────────────────────── #}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-lightbulb me-1"></i>解析 / 正确答案（可选）</div>
+    <div id="answerEditor"></div>
+    <input type="hidden" name="answer_content" id="answerContent">
+  </div>
+
+  {# ── 提交按鈕 ──────────────────────────────────────────────────────────────────── #}
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary px-4">
+      <i class="bi bi-check-lg me-1"></i>保存错题
+    </button>
+    <a href="{{ url_for('wrong_questions.index') }}" class="btn btn-outline-secondary">取消</a>
+  </div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script>
+// ── Quill 编辑器初始化 ──────────────────────────────────────────────────
+const toolbarOptions = [
+  ['bold','italic','underline','strike'],
+  ['blockquote','code-block'],
+  [{'header': [1,2,3,false]}],
+  [{'list':'ordered'},{'list':'bullet'}],
+  [{'color':[]},{'background':[]}],
+  ['clean']
+];
+
+const questionQuill = new Quill('#questionEditor', {
+  theme: 'snow',
+  modules: { toolbar: toolbarOptions },
+  placeholder: '在这里输入题目内容…'
+});
+
+const answerQuill = new Quill('#answerEditor', {
+  theme: 'snow',
+  modules: { toolbar: toolbarOptions },
+  placeholder: '在这里输入解析或正确答案（可选）…'
+});
+
+// ── 科目切换 → 异步加载知识点 ────────────────────────────────────
+const subjectSelect = document.getElementById('subjectSelect');
+const kpSelect      = document.getElementById('kpSelect');
+const kpNewField    = document.getElementById('kpNewField');
+
+subjectSelect.addEventListener('change', async () => {
+  const sid = subjectSelect.value;
+  kpSelect.innerHTML = '<option value="">加载中…</option>';
+  kpNewField.style.display = 'none';
+
+  if (!sid) {
+    kpSelect.innerHTML = '<option value="">— 请先选择科目 —</option>';
+    return;
+  }
+
+  const resp = await fetch(`/api/knowledge-points/${sid}`);
+  const kps  = await resp.json();
+
+  kpSelect.innerHTML = '<option value="">— 暂不指定 —</option>'
+    + kps.map(k => `<option value="${k.id}">[${k.chapter}] ${k.name}</option>`).join('')
+    + '<option value="__new__">✏️ 新建知识点…</option>';
+
+  kpNewField.style.display = 'none';
+});
+
+kpSelect.addEventListener('change', () => {
+  kpNewField.style.display = kpSelect.value === '__new__' ? 'block' : 'none';
+  if (kpSelect.value === '__new__') kpSelect.value = '';
+});
+
+// ── 图片预览 ────────────────────────────────────────────────────────
+document.getElementById('imageInput').addEventListener('change', function() {
+  const file    = this.files[0];
+  const preview = document.getElementById('imagePreview');
+  if (file) {
+    preview.src    = URL.createObjectURL(file);
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+});
+
+// ── 提交前写入隐藏域 ────────────────────────────────────────────────────
+document.getElementById('wqForm').addEventListener('submit', () => {
+  document.getElementById('questionContent').value =
+    questionQuill.root.innerHTML;
+  document.getElementById('answerContent').value =
+    answerQuill.root.innerHTML;
+});
+</script>
+{% endblock %}
