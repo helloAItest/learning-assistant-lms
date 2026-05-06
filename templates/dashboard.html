@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% block title %}首页 - 学习小助手{% endblock %}
+
+{% block content %}
+
+{# ═══════════════════════════════ 学生模式首页 ════════════════════════════════ #}
+{% if current_role == 'student' %}
+
+  {# ── 今日复习提醒 Banner ────────────────────────────────────────────────── #}
+  {% if today_review_count > 0 %}
+  <div class="review-banner mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+      <h5 class="mb-1 fw-bold">
+        <i class="bi bi-alarm-fill me-2"></i>今日待复习
+        <span class="review-count-badge">{{ today_review_count }}</span> 个知识点
+      </h5>
+      <p class="mb-0 opacity-75 small">坚持艾宾浩斯复习，记忆效果翻倍 💪</p>
+    </div>
+    <a href="#" class="btn btn-light fw-bold px-4">
+      <i class="bi bi-play-circle-fill me-1"></i>开始复习
+    </a>
+  </div>
+  {% else %}
+  <div class="review-banner review-banner--done mb-4 d-flex align-items-center gap-3">
+    <span style="font-size:2rem;">🎉</span>
+    <div>
+      <h5 class="mb-1 fw-bold">今日复习全部完成！</h5>
+      <p class="mb-0 opacity-75 small">继续保持，明天见 ✨</p>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── 快速统计卡片 ────────────────────────────────────────────────────────── #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card--blue">
+        <div class="stat-card__value">{{ today_review_count }}</div>
+        <div class="stat-card__label"><i class="bi bi-calendar-check me-1"></i>今日待复习</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card--coral">
+        <div class="stat-card__value">{{ total_wrong }}</div>
+        <div class="stat-card__label"><i class="bi bi-x-circle me-1"></i>待攻克错题</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card--teal">
+        <div class="stat-card__value">{{ week_wrong }}</div>
+        <div class="stat-card__label"><i class="bi bi-plus-circle me-1"></i>本周新增错题</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card--purple">
+        <div class="stat-card__value">9</div>
+        <div class="stat-card__label"><i class="bi bi-book me-1"></i>学习科目</div>
+      </div>
+    </div>
+  </div>
+
+  {# ── 快捷操作入口 ─────────────────────────────────────────────────────────── #}
+  <div class="row g-3 mb-4">
+    <div class="col-12">
+      <h6 class="text-muted fw-bold mb-3"><i class="bi bi-lightning-fill text-warning me-1"></i>快捷操作</h6>
+    </div>
+    <div class="col-6 col-md-3">
+      <a href="{{ url_for('wrong_questions.create') }}" class="shortcut-card text-decoration-none">
+          <div class="shortcut-card__icon" style="background:#fff0f0; color:#FF6B6B;">
+            <i class="bi bi-plus-circle-fill"></i>
+          </div>
+          <div class="shortcut-card__text">录入错题</div>
+        </a>
+    </div>
+    <div class="col-6 col-md-3">
+      <a href="#" class="shortcut-card text-decoration-none">
+        <div class="shortcut-card__icon" style="background:#f0fff8; color:#00B894;">
+          <i class="bi bi-calendar-week-fill"></i>
+        </div>
+        <div class="shortcut-card__text">复习计划</div>
+      </a>
+    </div>
+    <div class="col-6 col-md-3">
+      <a href="#" class="shortcut-card text-decoration-none">
+        <div class="shortcut-card__icon" style="background:#f5f0ff; color:#6C5CE7;">
+          <i class="bi bi-graph-up-arrow"></i>
+        </div>
+        <div class="shortcut-card__text">掌握情况</div>
+      </a>
+    </div>
+    <div class="col-6 col-md-3">
+      <a href="#" class="shortcut-card text-decoration-none">
+        <div class="shortcut-card__icon" style="background:#fffbf0; color:#F9CA24;">
+          <i class="bi bi-robot"></i>
+        </div>
+        <div class="shortcut-card__text">AI 分析</div>
+      </a>
+    </div>
+  </div>
+
+  {# ── 科目错题概览 + 最近错题 ─────────────────────────────────────────────── #}
+  <div class="row g-4">
+
+    {# 科目标签云 #}
+    <div class="col-12 col-md-5">
+      <div class="lms-card p-3 h-100">
+        <h6 class="card-section-title"><i class="bi bi-grid-fill me-1"></i>各科目错题数</h6>
+        <div class="mt-3">
+          {% for s in subjects_stats %}
+          <div class="subject-row mb-2">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="subject-label">
+                <span class="me-1">{{ s.icon }}</span>{{ s.name }}
+              </span>
+              <span class="subject-count fw-bold" style="color:{{ s.color }}">{{ s.wrong_count }}</span>
+            </div>
+            <div class="progress subject-progress" style="height:6px;">
+              {% set max_count = subjects_stats[0].wrong_count if subjects_stats[0].wrong_count > 0 else 1 %}
+              <div class="progress-bar subject-progress-bar"
+                   style="width:{{ (s.wrong_count / max_count * 100)|int }}%; background:{{ s.color }};">
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    {# 最近错题 #}
+    <div class="col-12 col-md-7">
+      <div class="lms-card p-3 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="card-section-title mb-0"><i class="bi bi-clock-history me-1"></i>最近录入</h6>
+          <a href="#" class="text-decoration-none small" style="color:var(--lms-primary);">全部 →</a>
+        </div>
+
+        {% if recent_wrongs %}
+          {% for wq in recent_wrongs %}
+          <div class="recent-wq-item d-flex align-items-start gap-3 py-2 {% if not loop.last %}border-bottom{% endif %}">
+            <span class="subject-dot" style="background:{{ wq.subject_color }}">{{ wq.subject_icon }}</span>
+            <div class="flex-grow-1 min-w-0">
+              <div class="wq-preview text-truncate small">
+                {{ wq.question_content | striptags | truncate(60) }}
+              </div>
+              <div class="d-flex gap-2 mt-1">
+                <span class="badge difficulty-badge difficulty-{{ wq.difficulty }}">
+                  {{ '简单' if wq.difficulty == 1 else ('中等' if wq.difficulty == 2 else '困难') }}
+                </span>
+                <span class="text-muted" style="font-size:0.75rem;">{{ wq.subject_name }}</span>
+              </div>
+            </div>
+            <a href="#" class="btn btn-sm btn-outline-secondary" style="font-size:0.75rem; white-space:nowrap;">查看</a>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <p class="mt-2">还没有错题记录<br><a href="#">点击录入第一道错题 →</a></p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>{# /row #}
+
+{# ═══════════════════════════════ 家长模式首页 ════════════════════════════════ #}
+{% else %}
+
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <span class="role-badge role-badge--parent">
+      <i class="bi bi-people-fill"></i> 家长模式
+    </span>
+    <span class="text-muted small">以下为学生学习数据概览（只读）</span>
+  </div>
+
+  {# 统计卡片 #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card--coral">
+        <div class="stat-card__value">{{ total_wrong }}</div>
+        <div class="stat-card__label"><i class="bi bi-x-circle me-1"></i>待攻克错题</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card--teal">
+        <div class="stat-card__value">{{ week_wrong }}</div>
+        <div class="stat-card__label"><i class="bi bi-plus-circle me-1"></i>本周新增</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card--blue">
+        <div class="stat-card__value">{{ today_review_count }}</div>
+        <div class="stat-card__label"><i class="bi bi-calendar-check me-1"></i>今日待复习</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card--purple">
+        <div class="stat-card__value">9</div>
+        <div class="stat-card__label"><i class="bi bi-book me-1"></i>学习科目</div>
+      </div>
+    </div>
+  </div>
+
+  {# 科目分布 #}
+  <div class="lms-card p-4">
+    <h6 class="card-section-title mb-3"><i class="bi bi-pie-chart-fill me-1"></i>各科目错题分布</h6>
+    <div class="row g-2">
+      {% for s in subjects_stats %}
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="subject-stat-pill" style="border-left: 4px solid {{ s.color }};">
+          <span>{{ s.icon }} {{ s.name }}</span>
+          <strong style="color:{{ s.color }}">{{ s.wrong_count }}</strong>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+{% endif %}
+{% endblock %}

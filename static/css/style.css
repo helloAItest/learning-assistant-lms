@@ -1,0 +1,285 @@
+/* ═══════════════════════════════════════════════════════════════
+   学习小助手 · 全局样式
+   配色：清爽渐变紫蓝 × 初中生友好界面
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── CSS Variables ──────────────────────────────────────────── */
+:root {
+  --lms-primary:    #667eea;
+  --lms-secondary:  #764ba2;
+  --lms-student:    #4ECDC4;
+  --lms-parent:     #FF6B6B;
+  --lms-bg:         #f4f6ff;
+  --lms-card-bg:    #ffffff;
+  --lms-border:     #e8ecff;
+  --lms-text:       #2d3436;
+  --lms-muted:      #8492a6;
+  --lms-radius:     14px;
+  --lms-shadow:     0 4px 20px rgba(102,126,234,.10);
+  --lms-shadow-lg:  0 8px 30px rgba(102,126,234,.16);
+}
+
+/* ── Base ───────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--lms-bg);
+  font-family: 'Microsoft YaHei', 'PingFang SC', 'Segoe UI', sans-serif;
+  color: var(--lms-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main { flex: 1; }
+
+/* ── Navbar ─────────────────────────────────────────────────── */
+.lms-navbar {
+  background: linear-gradient(135deg, var(--lms-primary) 0%, var(--lms-secondary) 100%);
+  box-shadow: 0 2px 20px rgba(102,126,234,.35);
+  padding: .6rem 0;
+}
+
+.lms-navbar .navbar-brand {
+  color: #fff !important;
+  font-size: 1.15rem;
+  letter-spacing: .02em;
+}
+
+.brand-icon { font-size: 1.4rem; line-height: 1; }
+
+.lms-navbar .nav-link {
+  color: rgba(255,255,255,.85) !important;
+  font-size: .9rem;
+  padding: .35rem .75rem !important;
+  border-radius: 8px;
+  transition: background .2s, color .2s;
+}
+
+.lms-navbar .nav-link:hover,
+.lms-navbar .nav-link.active {
+  background: rgba(255,255,255,.18);
+  color: #fff !important;
+}
+
+/* ── Role Badges ────────────────────────────────────────────── */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .35rem .9rem;
+  border-radius: 20px;
+  font-size: .82rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.role-badge--student { background: linear-gradient(135deg, #4ECDC4, #44a08d); }
+.role-badge--parent  { background: linear-gradient(135deg, #FF6B6B, #ee0979); }
+
+/* ── Switch Buttons ─────────────────────────────────────────── */
+.btn-switch {
+  border-radius: 8px;
+  font-size: .82rem;
+  font-weight: 600;
+  padding: .35rem .9rem;
+  border: 2px solid rgba(255,255,255,.6);
+  color: #fff;
+  background: transparent;
+  transition: background .2s;
+}
+
+.btn-switch:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+/* ── Flash Alert ────────────────────────────────────────────── */
+.lms-alert {
+  border: none;
+  border-radius: var(--lms-radius);
+  font-size: .9rem;
+}
+
+/* ── Cards ──────────────────────────────────────────────────── */
+.lms-card {
+  background: var(--lms-card-bg);
+  border: 1px solid var(--lms-border);
+  border-radius: var(--lms-radius);
+  box-shadow: var(--lms-shadow);
+  transition: transform .2s, box-shadow .2s;
+}
+
+.lms-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--lms-shadow-lg);
+}
+
+.card-section-title {
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--lms-text);
+  margin: 0;
+}
+
+/* ── Review Banner ──────────────────────────────────────────── */
+.review-banner {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  border-radius: var(--lms-radius);
+  color: #fff;
+  padding: 1.1rem 1.5rem;
+  box-shadow: 0 4px 18px rgba(245,87,108,.30);
+}
+
+.review-banner--done {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  box-shadow: 0 4px 18px rgba(17,153,142,.25);
+}
+
+.review-count-badge {
+  display: inline-block;
+  background: rgba(255,255,255,.3);
+  border-radius: 20px;
+  padding: 0 .6rem;
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 .2rem;
+}
+
+/* ── Stat Cards ─────────────────────────────────────────────── */
+.stat-card {
+  border-radius: var(--lms-radius);
+  padding: 1.2rem 1.3rem;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  width: 70px; height: 70px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.12);
+  right: -15px; top: -15px;
+}
+
+.stat-card__value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: .3rem;
+}
+
+.stat-card__label {
+  font-size: .8rem;
+  opacity: .9;
+}
+
+.stat-card--blue   { background: linear-gradient(135deg, #667eea, #764ba2); }
+.stat-card--coral  { background: linear-gradient(135deg, #FF6B6B, #ee0979); }
+.stat-card--teal   { background: linear-gradient(135deg, #11998e, #38ef7d); }
+.stat-card--purple { background: linear-gradient(135deg, #6C5CE7, #a29bfe); }
+
+/* ── Shortcut Cards ─────────────────────────────────────────── */
+.shortcut-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .6rem;
+  padding: 1rem .5rem;
+  background: #fff;
+  border: 1px solid var(--lms-border);
+  border-radius: var(--lms-radius);
+  text-align: center;
+  box-shadow: var(--lms-shadow);
+  color: var(--lms-text);
+  transition: transform .2s, box-shadow .2s;
+}
+
+.shortcut-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--lms-shadow-lg);
+  color: var(--lms-text);
+}
+
+.shortcut-card__icon {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.shortcut-card__text { font-size: .85rem; font-weight: 600; }
+
+/* ── Subject Progress ───────────────────────────────────────── */
+.subject-progress { background: #f0f0f8; border-radius: 4px; }
+.subject-progress-bar { border-radius: 4px; transition: width .6s ease; }
+
+.subject-label { font-size: .85rem; font-weight: 500; }
+.subject-count { font-size: .9rem; }
+
+/* ── Recent Wrong Questions ─────────────────────────────────── */
+.recent-wq-item { transition: background .15s; }
+.recent-wq-item:hover { background: #f9f9ff; border-radius: 8px; }
+
+.subject-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.wq-preview { color: var(--lms-text); font-size: .88rem; }
+
+/* ── Difficulty Badges ──────────────────────────────────────── */
+.difficulty-badge { font-size: .72rem; border-radius: 6px; padding: .2em .5em; }
+.difficulty-1 { background: #d4edda; color: #155724; }
+.difficulty-2 { background: #fff3cd; color: #856404; }
+.difficulty-3 { background: #f8d7da; color: #721c24; }
+
+/* ── Subject Stat Pills (家长视图) ──────────────────────────── */
+.subject-stat-pill {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .55rem .8rem;
+  background: #fff;
+  border-radius: 10px;
+  font-size: .85rem;
+  box-shadow: var(--lms-shadow);
+}
+
+/* ── Empty State ────────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--lms-muted);
+}
+
+.empty-state .bi { font-size: 2.5rem; display: block; margin-bottom: .5rem; opacity: .4; }
+
+/* ── Footer ─────────────────────────────────────────────────── */
+.lms-footer {
+  background: #fff;
+  border-top: 1px solid var(--lms-border);
+  font-size: .82rem;
+  color: var(--lms-muted);
+}
+
+/* ── Page Fade-in ────────────────────────────────────────────── */
+main { animation: lmsFadeIn .25s ease; }
+
+@keyframes lmsFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 576px) {
+  .stat-card__value { font-size: 1.6rem; }
+  .review-banner    { flex-direction: column; align-items: flex-start !important; }
+}
